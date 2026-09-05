@@ -19,8 +19,8 @@
 
 - **AI 보조(Claude, Anthropic Claude Code 환경):** 데이터 수집(크롤링) 실행, 정제, 데이터 분석,
   그에 따른 그래프 시각화, 검증용 코드북·검증 데이터 구축.
-- **연구자(류호현):** 연구 기획, 원고 집필, 데이터 표본 검수(`outputs/codebook_sample_200.csv` 대상)
-  및 최종 판단·승인.
+- **연구자(류호현):** 연구 기획, 원고 집필, 데이터 표본 검수(`outputs/codebook_sample_200.csv` 대상,
+  연구자 수행) 및 최종 판단·승인.
 - AI 산출 수치는 `scripts/27_claims_crosscheck.py`의 기계 대조(123건 전수 PASS)와 연구자의 표본 검수를
   거쳐 원고에 반영된다. 상세 절차는 `D_수치검증로그.md`.
 
@@ -28,5 +28,5 @@
 
 - A·B·C·D·E 문서와 산출물(스크립트 25–28, outputs/v2c_fig4·5, v2d_*, claims_crosscheck.csv,
   codebook_*.csv, script_manifest.csv)은 2026-09-06 기준 생성·검증 완료.
-- 외부 제공 방식(공개 저장소 vs 요청 시 제공)은 `E` 문서의 결정 대기 항목 참조 — 원고 §2.3은
-  "요청 시 제공"으로 기재됨.
+- 외부 제공 방식 확정(2026-09-06): 공개 저장소 https://github.com/tgrlyu/jjwxc-dual-market-genre-dynamics
+  에 코드·집계 산출물·보충자료 게시, 작품 단위 원자료는 요청 시 제공 — 상세는 `E` 문서.
