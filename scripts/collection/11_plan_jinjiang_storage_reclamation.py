@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Audit regenerable Jinjiang artifacts and plan storage reclamation.
+
+This command is deliberately read-only. It inventories known generated files,
+computes conservative reclamation scenarios, and records the producer needed
+to rebuild each artifact. It never deletes, moves, compresses, or rewrites data.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import shutil
+from dataclasses import dataclass
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATA_ROOT = PROJECT_ROOT / "data"
+GIB = 1024**3
+
+
+@dataclass(frozen=True)
+class ArtifactRule:
+    relative_path: str
+    role: str
+    policy: str
+    producer: str
+    regeneration: str
+
+
+RULES = (
+    ArtifactRule(
+        "raw_observations.sqlite",
+        "통합 관측치·master_raw 기본 DB",
+        "retain-primary-cache",
+        "scripts/02_ingest_all_full.py + scripts/03_build_master.py",
+        "python3 scripts/02_ingest_all_full.py && python3 scripts/03_build_master.py",
+    ),
+    ArtifactRule(
+        "master_raw.sqlite",
+        "raw_observations.sqlite 전체 백업본",
+        "reclaim-tier-1",
+        "scripts/03_build_master.py",
+        "python3 scripts/03_build_master.py",
+    ),
+    ArtifactRule(
+        "master_raw.csv",
+        "master_raw 테이블 CSV 내보내기",
+        "reclaim-tier-1",
+        "scripts/03_build_master.py",
+        "python3 scripts/03_build_master.py",
+    ),
+    ArtifactRule(
+        "nodes.csv",
+        "작품·저자 분석 노드",
+        "reclaim-tier-1",
+        "scripts/05_build_nodes.py",
+        "python3 scripts/05_build_nodes.py",
+    ),
+    ArtifactRule(
+        "edges.csv",
+        "작품·저자 분석 엣지",
+        "reclaim-tier-1",
+        "scripts/05_build_nodes.py",
+        "python3 scripts/05_build_nodes.py",
+    ),
+    ArtifactRule(
+        "vintage_2023.csv",
+        "2023 수집분 정규화 CSV",
+        "reclaim-tier-2",
+        "scripts/02_ingest_all_full.py",
+        "python3 scripts/02_ingest_all_full.py",
+    ),
+    ArtifactRule(
+        "vintage_2024.csv",
+        "2024 수집분 정규화 CSV",
+        "reclaim-tier-2",
+        "scripts/02_ingest_all_full.py",
+        "python3 scripts/02_ingest_all_full.py",
+    ),
+    ArtifactRule(
+        "vintage_2025.csv",
+        "2025 수집분 정규화 CSV",
+        "reclaim-tier-2",
+        "scripts/02_ingest_all_full.py",
+        "python3 scripts/02_ingest_all_full.py",
+    ),
+)
+
+
+def gib(value: int) -> float:
+    return round(value / GIB, 2)
+
+
+def build_report(data_root: Path, free_bytes: int, minimum_free_gib: float) -> dict[str, object]:
+    artifacts = []
+    for rule in RULES:
+        path = data_root / rule.relative_path
+        size = path.stat().st_size if path.is_file() else 0
+        artifacts.append(
+            {
+                "relative_path": rule.relative_path,
+                "path": path.as_posix(),
+                "exists": path.is_file(),
+                "size_bytes": size,
+                "size_gib": gib(size),
+                "role": rule.role,
+                "policy": rule.policy,
+                "producer": rule.producer,
+                "regeneration": rule.regeneration,
+            }
+        )
+
+    tier1 = sum(item["size_bytes"] for item in artifacts if item["policy"] == "reclaim-tier-1")
+    tier2 = sum(item["size_bytes"] for item in artifacts if item["policy"] == "reclaim-tier-2")
+    minimum_bytes = int(minimum_free_gib * GIB)
+
+    def scenario(name: str, reclaimed: int, includes: list[str]) -> dict[str, object]:
+        projected = free_bytes + reclaimed
+        return {
+            "name": name,
+            "includes": includes,
+            "reclaimable_bytes": reclaimed,
+            "reclaimable_gib": gib(reclaimed),
+            "projected_free_bytes": projected,
+            "projected_free_gib": gib(projected),
+            "meets_minimum": projected >= minimum_bytes,
+        }
+
+    return {
+        "generated_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "mode": "read-only-plan",
+        "data_root": data_root.as_posix(),
+        "current_free_bytes": free_bytes,
+        "current_free_gib": gib(free_bytes),
+        "minimum_free_gib": minimum_free_gib,
+        "artifacts": artifacts,
+        "scenarios": [
+            scenario("tier-1", tier1, ["reclaim-tier-1"]),
+            scenario("tier-1-plus-tier-2", tier1 + tier2, ["reclaim-tier-1", "reclaim-tier-2"]),
+        ],
+        "automatic_mutation": False,
+        "approval_required": "파일 삭제·이동·압축은 사용자 승인 후 별도 실행",
+    }
+
+
+def to_markdown(report: dict[str, object]) -> str:
+    date = dt.date.today().isoformat()
+    lines = [
+        "---",
+        f'id: "jinjiang-storage-reclamation-plan-{date}"',
+        'title: "진강 데이터 저장공간 회수 계획"',
+        "type: data_operations_plan",
+        f'date: "{date}"',
+        "themes: [진강문학성, 데이터셋, 저장공간, 재현성]",
+        'verification: "generated by scripts/11_plan_jinjiang_storage_reclamation.py; no files mutated"',
+        "---",
+        "",
+        "# 진강 데이터 저장공간 회수 계획",
+        "",
+        "> ⭐ 이 문서는 재생성 가능한 산출물의 용량과 계보를 계산하는 읽기 전용 계획이다. 삭제·이동·압축은 수행하지 않았다.",
+        "",
+        f"- 생성시각: `{report['generated_at']}`",
+        f"- 현재 여유공간: `{report['current_free_gib']} GiB`",
+        f"- 크롤링 시작 최소값: `{report['minimum_free_gib']} GiB`",
+        f"- 자동 변경: `{report['automatic_mutation']}`",
+        "",
+        "## 산출물 계보",
+        "",
+        "| 파일 | 역할 | 정책 | 크기(GiB) | 재생성 코드 |",
+        "|---|---|---|---:|---|",
+    ]
+    for item in report["artifacts"]:
+        lines.append(
+            f"| `{item['relative_path']}` | {item['role']} | `{item['policy']}` | {item['size_gib']} | `{item['producer']}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 회수 시나리오",
+            "",
+            "| 시나리오 | 회수량(GiB) | 예상 여유공간(GiB) | 30 GiB 게이트 |",
+            "|---|---:|---:|---|",
+        ]
+    )
+    for scenario in report["scenarios"]:
+        lines.append(
+            f"| `{scenario['name']}` | {scenario['reclaimable_gib']} | {scenario['projected_free_gib']} | {'PASS' if scenario['meets_minimum'] else 'BLOCKED'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 운용 결정",
+            "",
+            "- `retain-primary-cache`: 빠른 분석 재현의 기준 DB이므로 유지한다.",
+            "- `reclaim-tier-1`: 기준 DB에서 직접 재생성되는 중복·파생 산출물이다. 승인 후 우선 이동 또는 삭제할 수 있다.",
+            "- `reclaim-tier-2`: 외부 로컬 XLSX 정본부터 재수집해야 하므로 재생성 비용이 더 높다.",
+            "- 실제 조치 전 파일 크기·생성 코드·정본 XLSX 접근성을 다시 확인하고, 조치 후 동일 스크립트로 여유공간을 재측정한다.",
+            "- 크롤러는 저장공간 게이트가 PASS가 되기 전에는 네트워크 요청을 시작하지 않는다.",
+            "",
+            f"> 승인 상태: {report['approval_required']}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Plan read-only Jinjiang storage reclamation.")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
+    parser.add_argument("--minimum-free-gib", type=float, default=30.0)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
+
+    if args.minimum_free_gib <= 0:
+        raise SystemExit("--minimum-free-gib must be greater than 0")
+    probe = args.data_root.resolve()
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    free_bytes = shutil.disk_usage(probe).free
+    report = build_report(args.data_root, free_bytes, args.minimum_free_gib)
+    rendered = json.dumps(report, ensure_ascii=False, indent=2) if args.json else to_markdown(report)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+    print(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

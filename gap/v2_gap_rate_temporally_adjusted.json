@@ -1,0 +1,36 @@
+{
+  "01-finished": {
+    "label": "완결작",
+    "works": 884539,
+    "gap": 1335,
+    "newpub": 171,
+    "undated_pct": 25.5,
+    "gap_adjusted": 1164,
+    "gap_rate_pct": 0.151,
+    "gap_rate_adjusted_pct": 0.132,
+    "ratio_vs_finished": 1.0
+  },
+  "02-ongoing-derivative": {
+    "label": "연재·파생",
+    "works": 679503,
+    "gap": 98835,
+    "newpub": 597,
+    "undated_pct": 92.6,
+    "gap_adjusted": 98238,
+    "gap_rate_pct": 14.545,
+    "gap_rate_adjusted_pct": 14.457,
+    "ratio_vs_finished": 109.5
+  },
+  "03-ongoing-original-mv1": {
+    "label": "연재·원작(남주)",
+    "works": 276359,
+    "gap": 36136,
+    "newpub": 675,
+    "undated_pct": 83.0,
+    "gap_adjusted": 35461,
+    "gap_rate_pct": 13.076,
+    "gap_rate_adjusted_pct": 12.831,
+    "ratio_vs_finished": 97.2
+  },
+  "_note": "gap_adjusted = 연도크롤(2026-07-11~14) 이후 발표분(publish_time>=2026-07-11) 제외. 시간적 교란 통제."
+}
