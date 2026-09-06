@@ -85,6 +85,8 @@ claim("J3", "§3.1", "극정 2024년 14.6%", 14.6, genre[("原创", "剧情", 20
 j2018 = db1("SELECT COUNT(*) FROM analysis_master WHERE originality='原创' AND genre='剧情' AND publish_year='2018'") / \
         db1("SELECT COUNT(*) FROM analysis_master WHERE originality='原创' AND publish_year='2018'") * 100
 claim("J4", "표2/§4.3", "극정 2018년 0.4%", 0.4, j2018)
+claim("X1", "§3.1/§4.1", "선협 2024–26 하한 6.95%", 6.95, min(genre[("原创", "仙侠", y)] for y in (2024, 2025, 2026)), 0.005)
+claim("X2", "§3.1/§4.1", "선협 2024–26 상한 7.61%", 7.61, max(genre[("原创", "仙侠", y)] for y in (2024, 2025, 2026)), 0.005)
 
 # ── §3.2 파생 시장 ──
 for cid, y, v in [("D1", 2009, 96.1), ("D2", 2010, 95.8), ("D3", 2017, 85.0), ("D4", 2018, 65.9), ("D5", 2019, 30.6)]:
